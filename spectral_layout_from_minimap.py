@@ -49,7 +49,7 @@ def switch_ovl(id1, id2, ovl):
     Output : ovl, overlap between id2 and id1 """
     if (ovl.id1 == id1) and (ovl.id2 == id2):
         return ovl
-    
+
     elif (ovl.id1 == id2) and (ovl.id2 == id1):
         len1 = ovl.len2
         b1 = ovl.b2
@@ -90,30 +90,30 @@ def compute_overlaps(mini_fn, record_list):
     n_match_list = []
     ovl_len_list = []
     fh = open(mini_fn, 'rb')
-   
+
     for line in fh:
 
         ovl = MiniOvl(line)
         i_idx = read_nb_dic[ovl.id1]
         j_idx = read_nb_dic[ovl.id2]
-        
+
         # Discard self matches
         if i_idx == j_idx:
             continue
-        
+
         # Keep 1D indexing : h = n*i + j
         h_idx = n_reads*i_idx + j_idx
-        
+
         # Check if another overlap between i and j already exists
         duplicate_cond = (h_idx in h_list[-300:])
         if duplicate_cond:
             dupl_idx = h_list[-300:].index(h_idx) + len(h_list) - 300
             dupl_ovl = ovl_list[dupl_idx]
-            
+
             # Drop the overlap if the preexisting one is more significant
             if dupl_ovl.n_match > ovl.n_match:
                 continue
-            
+
             # Replace the preexisting overlap by the new one otherwise
             else:
                 n_match_list[dupl_idx] = dupl_ovl.n_match
@@ -121,7 +121,7 @@ def compute_overlaps(mini_fn, record_list):
                     + abs(dupl_ovl.e2 - dupl_ovl.b2))/2
                 ovl_len_list[dupl_idx] = ovl_len
                 continue
-        
+
         # Add the overlap if there was no other overlap between i and j
         ovl_list.append(ovl)
         h_list.append(h_idx)
@@ -130,18 +130,18 @@ def compute_overlaps(mini_fn, record_list):
         n_match_list.append(ovl.n_match)
         ovl_len = (abs(ovl.e1 - ovl.b1) + abs(ovl.e2 - ovl.b2))/2
         ovl_len_list.append(ovl_len)
-        
+
     fh.close()
     # Convert to numpy arrays
     h_list = np.array(h_list)
     n_match_list = np.array(n_match_list)
     ovl_len_list = np.array(ovl_len_list)
     k_list = np.array(k_list)
-    
+
     # Recover i_list and j_list from h_list indexing (h = n_reads*i + j)
     i_list = h_list//n_reads
     j_list = h_list - n_reads*i_list
-    
+
     fh.close()
 
     return read_nb_dic, ovl_list, i_list, j_list, k_list, n_match_list, ovl_len_list, n_reads
@@ -243,7 +243,17 @@ def spectral_ordering(a, min_cc_len):
             (fidval, fidvec) = get_fiedler(acc)
             # Extract permutation solution and save reordered connected component
             permu = np.argsort(fidvec)
-            ccs_ord[ccn] = [cc[idx] for idx in permu]
+            cc_ord = [cc[idx] for idx in permu]
+            ccs_ord[ccn] = cc_ord
+            # Check that reordered matrix looks roughly OK
+            aloc = a.copy().tocsr()
+            aloc = aloc[cc_ord, :]
+            aloc = aloc[:, cc_ord]
+            (ii, jj, _) = find(aloc)
+            bw = max(abs(ii-jj))
+            if bw >= 80 and verb >=1:
+                print(" WARNING : bandwidth %d >= 80 in reorderd cc %d of size \
+                %d. The order found may be wrong" % (bw, ccn, len(cc)))
 
     # Sort by length of connected component
     ccs_list = ccs_ord.values()
@@ -291,10 +301,10 @@ def compute_positions(cc, read_nb2id, ovl_list, ovl_idx_arr):
     # Restrict overlap index array to reads in the connected component (contig)
     ovl_idx_cc = ovl_idx_arr.tocsc()[:, cc]
     ovl_idx_cc = ovl_idx_cc.tocsr()[cc, :]
-    
+
     # symmetrize if the overlapper does not count overlap twice for (i,j) and (j,i)
     ovl_idx_cc = sym_max(ovl_idx_cc)
-    
+
     # Count number of neighbors in similarity graph to start with most central
     ovl_ones = ovl_idx_cc.copy()
     ovl_ones.data.fill(1)
@@ -313,7 +323,7 @@ def compute_positions(cc, read_nb2id, ovl_list, ovl_idx_arr):
     bpos[i_start] = 0
     i_done_set = {i_start}
     i_undone_set = set(range(cc_len)) - {i_start}
-    
+
     ldone_prec = len(i_done_set)
     while len(i_undone_set) > 0:
         # Compute position of reads towards the end of the contig
@@ -327,7 +337,7 @@ def compute_positions(cc, read_nb2id, ovl_list, ovl_idx_arr):
                 continue
             s_arr = np.empty(n_nbrs)
             b_arr = np.empty(n_nbrs)
-    
+
             i_id = read_nb2id[cc[i]]
             for (k, j) in enumerate(i_nbrs):
                 j_id = read_nb2id[cc[j]]
@@ -337,20 +347,20 @@ def compute_positions(cc, read_nb2id, ovl_list, ovl_idx_arr):
                 (b, s) = compute_abs_pos(bpos[j], strands[j], ovl)
                 s_arr[k] = s
                 b_arr[k] = b
-    
+
             # Make average
             s = np.sign(sum(s_arr)) #strand
             j_ok = [k for k in range(n_nbrs) if s_arr[k] == s] # read index j that yields the average strand
             b = np.mean(b_arr[j_ok])
             e = b + ovl.len2
-    
+
             strands[i] = s
             bpos[i] = b
             epos[i] = e
-    
+
             i_done_set = i_done_set | {i}
             i_undone_set = i_undone_set - {i}
-    
+
         # Compute position of reads towards the beginning of the contig
         for i in xrange(i_start-1, -1, -1):
             (_, i_nbrs, _) = find(ovl_idx_cc[i, :])
@@ -362,7 +372,7 @@ def compute_positions(cc, read_nb2id, ovl_list, ovl_idx_arr):
                 continue
             s_arr = np.empty(n_nbrs)
             b_arr = np.empty(n_nbrs)
-    
+
             i_id = read_nb2id[cc[i]]
             for (k, j) in enumerate(i_nbrs):
                 j_id = read_nb2id[cc[j]]
@@ -372,17 +382,17 @@ def compute_positions(cc, read_nb2id, ovl_list, ovl_idx_arr):
                 (b, s) = compute_abs_pos(bpos[j], strands[j], ovl)
                 s_arr[k] = s
                 b_arr[k] = b
-    
+
             # Make average
             s = np.sign(sum(s_arr)) #strand
             j_ok = [k for k in range(n_nbrs) if s_arr[k] == s] # read index j that yields the consensus strand
             b = np.mean(b_arr[j_ok])
             e = b + ovl.len2
-    
+
             strands[i] = s
             bpos[i] = b
             epos[i] = e
-    
+
             i_done_set = i_done_set | {i}
             i_undone_set = i_undone_set - {i}
 
@@ -393,9 +403,6 @@ def compute_positions(cc, read_nb2id, ovl_list, ovl_idx_arr):
             n_nn = int(1.5*n_nn)
         ldone_prec = ldone
 
-    # Add offset to have only positive positions
-    bpos -= min(bpos)
-    
     return strands, bpos, epos
 
 ###############################################################################
@@ -409,7 +416,7 @@ def write_layout_to_file(layout_fn, strands, bpos, cc, read_nb2id):
     (!) Convention : if strand == '-', the leftmost coordinate corresponds to
     the end of the read (i.e. to the beginning of the reverse component of the
     read). """
-    
+
     # Sort reads in connected component by exact position
     idx_sort = np.argsort(bpos)
     bpos = bpos[idx_sort]
@@ -422,10 +429,10 @@ def write_layout_to_file(layout_fn, strands, bpos, cc, read_nb2id):
         lmbc = bpos[idx]
         s = '+' if strands[idx] == 1 else '-'
         fh.write("%d\t%s\t%d\t%s\n" % (read_nb, read_id, lmbc, s))
-        
+
     fh.close()
     return
-    
+
 def write_poa_inputs(record_list, cc_dir, cc_idx, cc, strand_list, bpos_list,
                      epos_list, read_nb2id, w_len, w_ovl_len):
     """ Writes input files for POA for a given connected component (cc).
@@ -440,17 +447,18 @@ def write_poa_inputs(record_list, cc_dir, cc_idx, cc, strand_list, bpos_list,
     read_nb2id : dictionary {read index : read identifier}
     w_len : length of the windows
     w_ovl_len : length of the overlap between two consecutive windows"""
-    
+
     n_reads = len(bpos_list)
     idx_range_list = range(n_reads)
     if not(bpos_list.min() == 0):
-        bpos_list -= bpos_list.min()
-        epos_list -= bpos_list.min()
+        min_b = bpos_list.min()
+        bpos_list -= min_b
+        epos_list -= min_b
 
     cons_len = epos_list.max()
     n_windows = cons_len // (w_len - w_ovl_len)
     n_windows = int(n_windows +1)
-    
+
     for w_idx in xrange(n_windows):
         w_b = (w_len - w_ovl_len)*w_idx
         w_e = w_b + w_len
@@ -466,18 +474,18 @@ def write_poa_inputs(record_list, cc_dir, cc_idx, cc, strand_list, bpos_list,
             strd = strand_list[idx]
             if strd == -1:
                 read_seq = read_seq.reverse_complement()
-            
+
             # Trim read to the part contained in the window
             read_len = len(read_seq)
             bb = int(max(0, w_b - bpos_list[idx]))
             ee = int(read_len - max(0, epos_list[idx] - w_e))
             read_seq = read_seq[bb:ee]
-            
+
             # Write to poa_in file
             in_fh.write(">%s\n%s\n" % (read_id, read_seq))
-            
+
         in_fh.close()
-        
+
     return
 
 ###############################################################################
@@ -497,7 +505,7 @@ def plot_cc_pos_v_ref(all_reads_pos, cc, bpos_cc, figpath):
     ok_idx = np.argwhere(ref_pos_cc < 1e7)
     ref_pos_cc = ref_pos_cc[ok_idx]
     bpos_cc = bpos_cc[ok_idx]
-    
+
 #      Remove offset
 #    pos_cc -= pos_cc.min()
 #    bpos_cc -= bpos_cc.min()
@@ -507,7 +515,7 @@ def plot_cc_pos_v_ref(all_reads_pos, cc, bpos_cc, figpath):
     plt.savefig(figpath)
     plt.close()
     return
-    
+
 def plot_cc_pos_found(bpos_cc, figpath):
     """ Sanity check : plot the fine-grained layout found (positions of reads)
     vs the coarse-grained (ordering of the reads). If it does not look
@@ -531,31 +539,31 @@ def plot_cc_pos_found(bpos_cc, figpath):
 
 # Parse arguments
 parser = argparse.ArgumentParser()
-parser.add_argument("-r", "--root", type=str, default="./", 
+parser.add_argument("-r", "--root", type=str, default="./",
                     help="directory where to store layout files.")
-parser.add_argument("-f", "--fastafn", type=str, required=True, 
+parser.add_argument("-f", "--fastafn", type=str, required=True,
                     help="reads file path (fasta format))")
-parser.add_argument("-m", "--minimapfn", type=str, required=True, 
+parser.add_argument("-m", "--minimapfn", type=str, required=True,
                     help="overlap file path (from minimap in PAF format).")
 parser.add_argument("-w", "--write_poa_files", action="store_true",
                     help="Whether to write POA input files for \
                     consensus generation or not.")
-parser.add_argument("--w_len", type=int, default=2500, 
+parser.add_argument("--w_len", type=int, default=2500,
                     help="length of consensus windows for POA.")
-parser.add_argument("--w_ovl_len", type=int, default=1250, 
+parser.add_argument("--w_ovl_len", type=int, default=1250,
                     help="overlap length between two successive \
                     consensus windows.")
-parser.add_argument("--sim_thr", type=int, default=850, 
+parser.add_argument("--sim_thr", type=int, default=850,
                     help="threshold on overlap score \
                     (similarity matrix preprocessing.)")
-parser.add_argument("--len_thr", type=int, default=3500, 
+parser.add_argument("--len_thr", type=int, default=3500,
                     help="threshold on length of overlaps \
                     (similarity matrix preprocessing).")
-parser.add_argument("-v", "--verbosity", action="count", default=0, 
+parser.add_argument("-v", "--verbosity", action="count", default=0,
                     help="increase output verbosity. If verbosity=vv, \
                     also plots the fine-grained positions found \
                     of the reads ordered by spectral ordering.")
-parser.add_argument("--ref_pos_csvf", 
+parser.add_argument("--ref_pos_csvf",
                     help="csv file with position of reads \
                     (in same order as in fastafn) obtained from BWA, \
                     in order to plot reads position found vs reference.")
@@ -659,27 +667,35 @@ if verb == 1:
 elif verb >=2:
     print ("... Done in %3.1fs. Total time elapsed %3.1fs" \
     % (time() - t1, time() - t0))
-    
+
 # Get fine-grained layout with dictionary of overlaps in each connected component
 if verb >= 1:
     print("Compute fine-grained layout, print positions of reads to file \
     and print POA input files and graphics if asked for.")
 t1 = time()
+
+# If root_dir does not exist, create it
+try:
+    os.mkdir(root_dir)
+    os.chdir(root_dir)
+except:
+    os.chdir(root_dir)
+
 for (cc_idx, cc) in enumerate(ccs_list):
-    
+
     # Compute strand and leftmost base coordinate for each read in cc
     (strand_list, bpos_list, epos_list) = compute_positions(cc, read_nb2id, ovl_list, ovl_idx_arr)
     if verb >=2:
         print("Connected component %d/%d" % (cc_idx, len(ccs_list)))
         print "Positions computed in %3.1fs - cc %d of size %d" % (time() - t1, cc_idx +1, len(cc))
-    
+
     # Write file with layout
     layout_fn = "%s/cc%d.layout" % (root_dir, cc_idx)
     write_layout_to_file(layout_fn, strand_list, bpos_list, cc, read_nb2id)
     if verb >= 2:
         print("Layout written to file.")
         t1 = time()
-    
+
     if do_write_poa:
         # Write input files for POA to compute consensus
         cc_dir = "%s/cc_%d" % (root_dir, cc_idx)
@@ -706,3 +722,6 @@ for (cc_idx, cc) in enumerate(ccs_list):
             reference (BWA)).")
         figpath = root_dir + "/pos_found_vs_ref_cc%d.eps" % (cc_idx)
         plot_cc_pos_v_ref(ref_pos_list, cc, bpos_list, figpath)
+
+if verb >= 1:
+    print("All done, total time elapsed : %3.1fs." % (time() - t0))

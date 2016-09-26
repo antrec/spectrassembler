@@ -14,16 +14,16 @@ To install (require gcc and zlib):
 git clone https://github.com/lh3/minimap && (cd minimap && make)
 ```
 
-* python packages : numpy, scipy, biopython. Easy install with pip for example : ```pip install biopython```
+* python packages : numpy, scipy, [biopython][biopython]. Easy install with pip for example : ```pip install biopython```
 
-* multiple sequence aligner : [poa][poa] (for consensus generation. Not needed to compute the layout)
+* multiple sequence aligner : [poa][poa] (for consensus generation only. Not needed to compute the layout)
 
 * (optional) mapping to reference : [bwa][bwa]. Needed only if you have a reference genome available and wish to plot the layout found by our algorithm vs the one found by mapping against the reference genome.
 
 ## Getting started
-Create a working directory
+Get the code
 ```sh
-mkdir oxford-test && cd oxford-test
+git clone https://github.com/antrec/spectrassembler
 ```
 The Loman lab released a set of E. Coli Oxford Nanopore reads (see their [page] (http://lab.loman.net/2015/09/24/first-sqk-map-006-experiment/)) or download from the command line:
 ```sh
@@ -43,13 +43,34 @@ A file reads_position.csv containing the position of the reads in the same order
 )
 
 
-Now run the main program, passing the fasta file (```-f```), minimap overlap file (```-m```), the instruction to write input files for [poa][poa] (used to derive the consensus sequences) with the flag (```-w```) , setting verbosity to high (```-vv```) and providing the path to the csv file containing the position of the reads found by mapping with BWA if it was computed with ```--ref_pos_csvf```.
+Now run the main program, passing the fasta file (```-f```), minimap overlap file (```-m```), the instruction to write input files for [poa][poa] (used to derive the consensus sequences) with the flag ```-w```, setting verbosity to high (```-vv```), providing the path to the csv file containing the position of the reads found by mapping with BWA if it was computed with ```--ref_pos_csvf``` and creating files in the root directory (```r```) oxford-test
 ```sh
-python spectral_layout_from_minimap.py -f oxford.fasta -m oxford.mini -w -vv --ref_pos_csvf reads_position.csv
+python spectral_layout_from_minimap.py -f oxford.fasta -m oxford.mini -w -vv --ref_pos_csvf reads_position.csv -r oxford-test
 ```
+This constructs a similarity matrix from the overlaps, with a threhsold on the number of matches found for an overlap (this threshold can be modified with ```--sim_thr```, default value is 850). The layout is computed in each of the connected component of the similarity graph, and written to a file ```cc%d.layout``` where %d is the number of the connected component. As the option ```-w``` is specified, for each connected component %d, a subdirectory ```./cc%d``` is created, containing input files for [poa][poa] in order to compute a consensus sequences in a sliding window. If a file containing the position of the reads was given with ```--ref_pos_csvf```, scatter plots are generated, showing the position found by our algorithm vs the position found by mapping to the reference (for each read mapped in a given connected component).
 
+The layout being computed, you can generate consensus sequences in each connected component. First we compute a consensus per window, which can be done in parallel or on a cluster, depending on the number of nodes you have. Let us say you have 4 CPUs and wish to compute a consensus sequence for the third largest connected component, you can use the following script (poa must be on your path, if it's not you can specify the path to it with ```poa=path/to/poa/poa```and then call ```$poa```instead of ```poa```) :
+```sh
+NUM_CC=3
+NUM_NODES=3
+SCORE_MAT="poa-blosum80MODIF.mat"
+cd ./cc_$NUM_CC
+for file in poa_in_cc_*.fasta
+do
+  while [`jobs | wc -l` -ge $NUM_NODES ]
+  do
+    sleep 5
+  done
+  if ! test -f $file.clustal.out
+  then
+    poa -read_fasta $file -clustal $file.clustal.out -hb $SCORE_MAT &
+  fi
+done
+```
+Then you just need to join together the windows
 
 [minimap]: https://github.com/lh3/minimap
 [nanocorrect]: https://github.com/jts/nanocorrect/
 [poa]: https://sourceforge.net/projects/poamsa/
 [bwa]: http://bio-bwa.sourceforge.net/
+[biopython]: http://biopython.org/wiki/Download#Easy_Install
