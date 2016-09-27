@@ -20,13 +20,17 @@ git clone https://github.com/lh3/minimap && (cd minimap && make)
 
 * (optional) mapping to reference : [bwa][bwa]. Needed only if you have a reference genome available and wish to plot the layout found by our algorithm vs the one found by mapping against the reference genome.
 
-## Getting started
-Get the code
+## Walking through it
+We follow the main steps of the pipeline in the following to get started. The code can also be used in a more black-box way with the shell script main.sh (see next section).
+
+Get the code and save path to it to use scripts later
 ```sh
 git clone https://github.com/antrec/spectrassembler
+cd spectrassembler && srcd=`pwd` && cd ../
 ```
-The Loman lab released a set of E. Coli Oxford Nanopore reads (see their [page] (http://lab.loman.net/2015/09/24/first-sqk-map-006-experiment/)) or download from the command line:
+Create a working directory and download data. The Loman lab released a set of E. Coli Oxford Nanopore reads (see their [page] (http://lab.loman.net/2015/09/24/first-sqk-map-006-experiment/)) which can be downloaded from the command line:
 ```sh
+mkdir oxford-test && cd oxford-test
 curl -L -o oxford.fasta http://nanopore.s3.climb.ac.uk/MAP006-PCR-1_2D_pass.fasta
 ```
 Compute alignments with [minimap][minimap]
@@ -37,37 +41,86 @@ minimap -S oxford.fasta oxford.fasta > oxford.mini
 ```sh
 bwa index oxford_reference.fa
 bwa bwasw oxford_reference.fa oxford.fasta > oxford.sam
-python get_position_from_sam.py oxford.sam oxford.fasta
+python $srcd/get_position_from_sam.py oxford.sam oxford.fasta #Run the python file from spectrassembler folder
 ```
 A file reads_position.csv containing the position of the reads in the same order as in the fasta file is created in the working directory.
 )
 
 
-Now run the main program, passing the fasta file (```-f```), minimap overlap file (```-m```), the instruction to write input files for [poa][poa] (used to derive the consensus sequences) with the flag ```-w```, setting verbosity to high (```-vv```), providing the path to the csv file containing the position of the reads found by mapping with BWA if it was computed with ```--ref_pos_csvf``` and creating files in the root directory (```r```) oxford-test
+Now run the main program, passing the fasta file (```-f```), minimap overlap file (```-m```), the instruction to write input files for [poa][poa] (used to derive the consensus sequences) with the flag ```-w```, setting verbosity to high (```-vv```), providing the path to the csv file containing the position of the reads found by mapping with BWA if it was computed with ```--ref_pos_csvf``` and creating files in the current directory (```-r not specified```)
 ```sh
-python spectral_layout_from_minimap.py -f oxford.fasta -m oxford.mini -w -vv --ref_pos_csvf reads_position.csv -r oxford-test
+python $srcd/spectral_layout_from_minimap.py -f oxford.fasta -m oxford.mini -w -vv --ref_pos_csvf reads_position.csv
 ```
 This constructs a similarity matrix from the overlaps, with a threhsold on the number of matches found for an overlap (this threshold can be modified with ```--sim_thr```, default value is 850). The layout is computed in each of the connected component of the similarity graph, and written to a file ```cc%d.layout``` where %d is the number of the connected component. As the option ```-w``` is specified, for each connected component %d, a subdirectory ```./cc%d``` is created, containing input files for [poa][poa] in order to compute a consensus sequences in a sliding window. If a file containing the position of the reads was given with ```--ref_pos_csvf```, scatter plots are generated, showing the position found by our algorithm vs the position found by mapping to the reference (for each read mapped in a given connected component).
 
-The layout being computed, you can generate consensus sequences in each connected component. First we compute a consensus per window, which can be done in parallel or on a cluster, depending on the number of nodes you have. Let us say you have 4 CPUs and wish to compute a consensus sequence for the third largest connected component, you can use the following script (poa must be on your path, if it's not you can specify the path to it with ```poa=path/to/poa/poa```and then call ```$poa```instead of ```poa```) :
+The layout being computed, you can generate consensus sequences in each connected component. First we compute a consensus per window, which can be done in parallel or on a cluster, depending on the number of nodes you have. Let us say you have 4 CPUs and wish to compute a consensus sequence for the third largest connected component, you can use the following shell script or something similar adapted to your cluster (poa must be on your path, if not, add it with ```PATH=$PATH:/path/to/poa/```).
 ```sh
 NUM_CC=3
-NUM_NODES=3
-SCORE_MAT="poa-blosum80MODIF.mat"
+NUM_NODES=4
+SCORE_MAT="$srcd/poa-score.mat" #score matrix for the multiple sequence alignment
 cd ./cc_$NUM_CC
 for file in poa_in_cc_*.fasta
 do
   while [`jobs | wc -l` -ge $NUM_NODES ]
   do
-    sleep 5
+    sleep 2
   done
-  if ! test -f $file.clustal.out
+  if ! test -f $file.clustal.out #Do not recompute the same thing twice in case you stopped a computation earlier.
   then
     poa -read_fasta $file -clustal $file.clustal.out -hb $SCORE_MAT &
   fi
 done
+cd ../
 ```
-Then you just need to join together the windows
+Then you can join together the windows with
+```sh
+python $srcd/gen_cons_from_poa.py -cc $NUM_CC --poa_mat_path $SCORE_MAT -vv
+```
+which will create a file ```consensus_cc_3.fasta``` in the current directory (oxford-test).
+
+## Manual
+Main python script that computes layout
+```sh
+python spectral_layout_from_minimap.py -f reads.fasta -m overlaps.mini
+[-h (--help)]
+[-f : file containing reads in FASTA format]
+[-m : overlap file from minimap in PAF format]
+[-r (--root) : root directory where to write layout files (default "./")]
+[-w (--write_poa_files) : Whether to write POA input files for consensus generation or not.]
+[--w_len <int(2500)> : length of consensus windows for POA]
+[--w_ovl_len <int(1250)> : overlap length between two successive consensus windows]
+[--sim_thr <int(850)> : threshold on overlap score (similarity matrix preprocessing). This is a
+crucial parameter that should be increased for repetitive genomes (e.g., eukaryotic) or if
+the results are unsatisfactory. Conversely, if the assembly is too fragmented (too many contigs),
+it can be decreased. It should also be modified according to the overlapper used
+(this value was chosen when using minimap).]
+[--len_thr <int(3500)> : threshold on the length of the overlap (similarity matrix preprocessing)]
+[--ref_pos_csvf : csv file (generated with get_position_from_sam.py)
+with position of reads (in same order as in the fasta file)
+obtained from BWA, in order to plot reads position found vs reference.)]
+[-v verbosity level (-v, -vv or none), default none]
+```
+
+Python script to compute consensus after ```spectral_layout_from_minimap.py``` was ran with the ```-w```option :
+```sh
+python gen_cons_from_poa.py -cc 3 --poa_mat_path /path/to/poa-score.mat -vv
+[-h (--help)]
+[-cc (--contig) : index of contig you wish to compute consensus for]
+[--poa_mat_path : path to score matrix file for alignment]
+[--poa_path : path to poa executable if it is not on your path
+(do not specify this option if poa is on your path)]
+[-r (--root) : root directory where to write layout files (default "./")]
+[--w_len <int(2500)> : length of consensus windows for POA.
+! MUST BE THE SAME VALUE AS IN spectral_layout_from_minimap.py !]
+[--w_ovl_len <int(1250)> : overlap length between two successive consensus windows
+! MUST BE THE SAME VALUE AS IN spectral_layout_from_minimap.py !]
+[-v verbosity level (-v, -vv or none), default none]
+```
+
+Python script to get position of the reads in a csv file from .sam file after mapping
+```sh
+get_position_from_sam.py mapping.sam reads.fasta
+```
 
 [minimap]: https://github.com/lh3/minimap
 [nanocorrect]: https://github.com/jts/nanocorrect/

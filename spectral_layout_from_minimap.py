@@ -547,26 +547,24 @@ parser.add_argument("-m", "--minimapfn", type=str, required=True,
                     help="overlap file path (from minimap in PAF format).")
 parser.add_argument("-w", "--write_poa_files", action="store_true",
                     help="Whether to write POA input files for \
-                    consensus generation or not.")
+consensus generation or not.")
 parser.add_argument("--w_len", type=int, default=2500,
                     help="length of consensus windows for POA.")
 parser.add_argument("--w_ovl_len", type=int, default=1250,
                     help="overlap length between two successive \
-                    consensus windows.")
+consensus windows.")
 parser.add_argument("--sim_thr", type=int, default=850,
                     help="threshold on overlap score \
-                    (similarity matrix preprocessing.)")
+(similarity matrix preprocessing.)")
 parser.add_argument("--len_thr", type=int, default=3500,
                     help="threshold on length of overlaps \
-                    (similarity matrix preprocessing).")
+(similarity matrix preprocessing).")
 parser.add_argument("-v", "--verbosity", action="count", default=0,
-                    help="increase output verbosity. If verbosity=vv, \
-                    also plots the fine-grained positions found \
-                    of the reads ordered by spectral ordering.")
+                    help="verbosity level (-v, -vv or none)")
 parser.add_argument("--ref_pos_csvf",
                     help="csv file with position of reads \
-                    (in same order as in fastafn) obtained from BWA, \
-                    in order to plot reads position found vs reference.")
+(in same order as in fastafn) obtained from BWA, \
+in order to plot reads position found vs reference.")
 
 args = parser.parse_args()
 
