@@ -21,7 +21,7 @@ git clone https://github.com/lh3/minimap && (cd minimap && make)
 * (optional) mapping to reference : [bwa][bwa]. Needed only if you have a reference genome available and wish to plot the layout found by our algorithm vs the one found by mapping against the reference genome.
 
 ## Walking through it
-We follow the main steps of the pipeline in the following to get started. The code can also be used in a more black-box way with the shell script main.sh (see next section).
+We follow the main steps of the pipeline in the following to get started. The code can also be used in a more black-box way with the shell script spectrassembler_pipeline.sh (see next section).
 
 Get the code and save path to it to use scripts later
 ```sh
