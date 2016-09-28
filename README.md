@@ -1,5 +1,5 @@
 # spectrassembler
-Doc and full code to come (in a couple of days)
+Created by Antoine Recanati at INRIA, Paris.
 
 ## Introduction
 We provide the code used in [our paper] (http://arxiv.org/abs/1609.07293) to obtain the layout of uncorrected long-reads from the overlaps in an original and efficient way. It takes as input an overlap file (from [minimap][minimap]) and uses a spectral algorithm to find an ordering of the reads from the pairwise overlap information. This ordering should roughly match the sorting of the reads by position on the genome. This ordering can be viewed as a coarse-grained layout, from which a more refined one is computed with the overlap information.
@@ -78,9 +78,10 @@ python $srcd/gen_cons_from_poa.py -cc $NUM_CC --poa_mat_path $SCORE_MAT -vv
 ```
 which will create a file ```consensus_cc_3.fasta``` in the current directory (oxford-test).
 
-## Manual
-Main python script that computes layout
-```sh
+## Usage
+What's in the box :
+* Main python script that computes layout
+```
 python spectral_layout_from_minimap.py -f reads.fasta -m overlaps.mini
 [-h (--help)]
 [-f : file containing reads in FASTA format]
@@ -101,8 +102,8 @@ obtained from BWA, in order to plot reads position found vs reference.)]
 [-v verbosity level (-v, -vv or none), default none]
 ```
 
-Python script to compute consensus after ```spectral_layout_from_minimap.py``` was ran with the ```-w```option :
-```sh
+* Python script to compute consensus after ```spectral_layout_from_minimap.py``` was ran with the ```-w```option
+```
 python gen_cons_from_poa.py -cc 3 --poa_mat_path /path/to/poa-score.mat -vv
 [-h (--help)]
 [-cc (--contig) : index of contig you wish to compute consensus for]
@@ -117,10 +118,13 @@ python gen_cons_from_poa.py -cc 3 --poa_mat_path /path/to/poa-score.mat -vv
 [-v verbosity level (-v, -vv or none), default none]
 ```
 
-Python script to get position of the reads in a csv file from .sam file after mapping
-```sh
+* Python script to get position of the reads in a csv file from .sam file after mapping
+```
 get_position_from_sam.py mapping.sam reads.fasta
 ```
+
+* And the shell script ```spectrassembler_pipeline.sh``` which can be used to perform the full pipeline.
+Modify the definitions with your own paths and file names in the beginning of the script and then run ```/bin/bash spectrassembler_pipeline.sh```.
 
 [minimap]: https://github.com/lh3/minimap
 [nanocorrect]: https://github.com/jts/nanocorrect/
