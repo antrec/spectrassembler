@@ -76,6 +76,7 @@ if ["$DO_CONSENSUS" == true]; then
       fi
     done
     cd ../
+    python $SRC_DIR/gen_cons_from_poa.py -cc $cc_idx --poa_mat_path $SCORE_MAT $VERB_OPT
   done
 fi
 
