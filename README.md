@@ -33,11 +33,11 @@ Create a working directory and download data. The Loman lab released a set of E.
 mkdir oxford-test && cd oxford-test
 curl -L -o oxford.fasta http://nanopore.s3.climb.ac.uk/MAP006-PCR-1_2D_pass.fasta
 ```
-Compute alignments with [minimap][minimap]
+Compute alignments with [minimap][minimap] (you may have to specify the full path to minimap)
 ```sh
 minimap -S oxford.fasta oxford.fasta > oxford.mini
 ```
-(Optional : If you want to check the layout found against the reference genome, you can download a FASTA file of the reference genome of E. Coli K-12 substr. MG1655. [here] (https://www.ncbi.nlm.nih.gov/nuccore/556503834). If you saved it under the name oxford_reference.fa then you can run [bwa][bwa] to map the reads against the reference :
+(Optional : If you want to check the layout found against the reference genome, you can download a FASTA file of the reference genome of E. Coli K-12 substr. MG1655. [here] (https://www.ncbi.nlm.nih.gov/nuccore/556503834). If you saved it under the name oxford_reference.fa then you can run [bwa][bwa] to map the reads against the reference (you also may have to specify path to bwa) :
 ```sh
 bwa index oxford_reference.fa
 bwa bwasw oxford_reference.fa oxford.fasta > oxford.sam
