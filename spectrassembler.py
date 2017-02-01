@@ -46,7 +46,8 @@ parser.add_argument("-v", "--verbosity", action="count", default=1,
 parser.add_argument("--ref_pos_csvf",
                     help="csv file with position of reads (in same order as in READS_FN)" \
                          "obtained from BWA, in order to plot reads position found vs reference.")
-parser.add_argument("--spoapath", help="path to spoa executable", default="spoa")
+parser.add_argument("--spoapath", help="path to spoa executable", \
+default="tools/spoa/spoa")
 parser.add_argument("--nproc", help="number of parallel processes", type=int,
                     default=1)
 parser.add_argument("--margin", type=int, default=1250,
