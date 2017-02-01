@@ -57,15 +57,22 @@ def fill_args_opts(args):
     opts['MERGE_MARGIN'] = args.margin
 
     # Check if SPOA found
-    SPOA_PATH = subprocess.check_output("which %s; exit 0" % args.spoapath,
-                                        stderr=subprocess.STDOUT, shell=True)
-    if len(SPOA_PATH) > 0:
-        opts['SPOA_PATH'] = SPOA_PATH.split('\n')[0]
+    if os.path.exists(args.spoapath):
+        opts['SPOA_PATH'] = args.spoapath
         opts['DO_SPOA'] = True
     else:
-        opts['DO_SPOA'] = False
-        msg = "spoa executable not found. Provide it with option --spoapath if you wish to compute consensus sequences"
-        oprint(msg)
+        # In case spoa is in the $PATH but not explicitely given
+        try:
+            SPOA_PATH = subprocess.check_output("which %s; exit 0" % args.spoapath,
+                                                stderr=subprocess.STDOUT, shell=True)
+            opts['SPOA_PATH'] = SPOA_PATH.split('\n')[0]
+            opts['DO_SPOA'] = True
+        # Otherwise do not perform consensus
+        except:
+            opts['DO_SPOA'] = False
+            msg = "spoa executable not found. Provide it with option"\
+                  "--spoapath if you wish to compute consensus sequences"
+            oprint(msg)
 
     DO_PLOT_POS_V_REF = False
     if args.ref_pos_csvf is not None:

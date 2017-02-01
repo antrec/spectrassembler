@@ -23,10 +23,9 @@ We follow the main steps of the pipeline in the following to get started. The co
 Get the code and save path to it to use scripts later
 ```sh
 git clone https://github.com/antrec/spectrassembler
-cd spectrassembler && srcd=`pwd` && \
-git submodule init && git submodule update && \
-cd tools/spoa && git submodule init && git submodule update && \
-make && cd ../../../
+cd spectrassembler && srcd=`pwd` && git submodule init && git submodule update && \
+cd tools/spoa && git submodule init && git submodule update && make
+cd ../../../
 ```
 Create a working directory and download data. The Loman lab released a set of E. Coli Oxford Nanopore reads (see their [page] (http://lab.loman.net/2015/09/24/first-sqk-map-006-experiment/)) which can be downloaded from the command line:
 ```sh
@@ -40,8 +39,7 @@ minimap -Sw5 -L100 -m0 oxford.fasta oxford.fasta > oxford.mini.paf
 
 Now run the main program, passing the fasta file (```-f```), minimap overlap file (```-m```), setting verbosity to high (```-vvv```) and creating files in a temporary directory (```-r temp```)
 ```sh
-python $srcd/spectrassembler.py \
--f oxford.fasta -m oxford.mini.paf -r temp -vvv > contigs.fasta
+python $srcd/spectrassembler.py -f oxford.fasta -m oxford.mini.paf -r temp -vvv > contigs.fasta
 ```
 This constructs a similarity matrix from the overlaps, with a threshold on the number of matches found for an overlap (this threshold can be modified with ```--sim_qtile```, default is to remove the 40% lowest values (--sim_qtile 0.4)). The layout is computed in each of the connected component of the similarity graph, and written to a file ```cc%d.layout``` where %d is the number of the connected component. For each connected component %d, a subdirectory ```./cc%d``` is created, containing input files for [spoa][spoa] in order to compute a consensus sequences in a sliding window. The contigs are written to stdout.
 
