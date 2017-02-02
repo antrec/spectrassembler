@@ -60,7 +60,6 @@ spectrassembler = tools_path.split('/tools')[0]
 
 # Open script file
 script_fn = "%s_script.sh" % (args.prefix)
-print "Create bash script %s" %	(script_fn)
 fh = open(script_fn, 'wb')
 
 # Prelude
@@ -95,10 +94,9 @@ if args.miniasm:
 # Run spectrassembler
 fh.write("# Run spectrassembler\n")
 spectral_out = "%s/%s.spectral.fasta" % (args.dir, args.prefix)
-spectral_dir = "%s/spectral" % (args.dir)
 mycmd = cmd_printer("python %s/spectrassembler.py" % (spectrassembler), "-f $reads",
-            "-m", minimap_out, "-r", args.dir, "--spoapath", args.spoa,
-            args.spectrassembler_opts, "-r", spectral_dir, output=spectral_out)
+            "-m", minimap_out, "-r", args.dir,
+            args.spectrassembler_opts, output=spectral_out)
 fh.write(mycmd)
 
 # Run Racon if provided
@@ -136,16 +134,13 @@ if args.racon and args.minimap:
         fh.write(mycmd)
 
         # Run Racon
-        racon_out = "%s/%s.miniasm_racon.fasta" % (args.dir, args.prefix)
+        racon_out = "%s/%s.racon.fasta" % (args.dir, args.prefix)
         mycmd = cmd_printer(args.racon, "$readsq", mappings_out, miniasm_out, racon_out)
         fh.write(mycmd)
 
 # Run Canu if provided
 if args.canu:
     fh.write("# Run Canu\n")
-    canu_dir = "%s/canu" % (args.dir)
-    mycmd = cmd_printer(args.canu, "-p", args.prefix, "-d", canu_dir,
+    mycmd = cmd_printer(args.canu, "-p", args.prefix, "-d", args.dir,
     args.canu_opts)
     fh.write(mycmd)
-
-fh.close()
