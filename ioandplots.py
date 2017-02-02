@@ -58,7 +58,7 @@ def fill_args_opts(args):
 
     # Check if SPOA found
     if os.path.exists(args.spoapath):
-        opts['SPOA_PATH'] = args.spoapath
+        opts['SPOA_PATH'] = os.path.abspath(args.spoapath)
         opts['DO_SPOA'] = True
     else:
         # In case spoa is in the $PATH but not explicitely given
