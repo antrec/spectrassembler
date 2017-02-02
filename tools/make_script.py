@@ -84,7 +84,7 @@ fh.write(mycmd)
 if args.miniasm:
     fh.write("# Run miniasm\n")
     miniasm_out = "%s/%s.miniasm.gfa" % (args.dir, args.prefix)
-    mycmd = cmd_printer(args.miniasm, args.miniasm_opts, "-f", args.reads,
+    mycmd = cmd_printer(args.miniasm, args.miniasm_opts, "-f $reads",
     minimap_out, output=miniasm_out)
     fh.write(mycmd)
     miniasm_fasta = "%s/%s.miniasm.fasta" % (args.dir, args.prefix)
@@ -94,8 +94,9 @@ if args.miniasm:
 # Run spectrassembler
 fh.write("# Run spectrassembler\n")
 spectral_out = "%s/%s.spectral.fasta" % (args.dir, args.prefix)
+spectral_dir = "%s/spectral" % (args.dir)
 mycmd = cmd_printer("python %s/spectrassembler.py" % (spectrassembler), "-f $reads",
-            "-m", minimap_out, "-r", args.dir,
+            "-m", minimap_out, "-r", spectral_dir,
             args.spectrassembler_opts, output=spectral_out)
 fh.write(mycmd)
 
@@ -141,6 +142,7 @@ if args.racon and args.minimap:
 # Run Canu if provided
 if args.canu:
     fh.write("# Run Canu\n")
-    mycmd = cmd_printer(args.canu, "-p", args.prefix, "-d", args.dir,
+    canu_dir = "%s/canu" % (args.dir)
+    mycmd = cmd_printer(args.canu, "-p", args.prefix, "-d", canu_dir,
     args.canu_opts)
     fh.write(mycmd)

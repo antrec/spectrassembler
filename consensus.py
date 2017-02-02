@@ -212,7 +212,7 @@ def run_spoa_and_consensus(in_fn, out_fn, spoa_path):
 
     # Check that file exists and is not empty
     # ! Should add a safeguard to stop also if empty sequence
-    if (not(os.path.exists(in_fn)) or os.path.getsize(in_fn)==0:
+    if (not(os.path.exists(in_fn)) or os.path.getsize(in_fn)==0):
         return ''
 
     # Run spoa
