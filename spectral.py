@@ -137,6 +137,7 @@ def get_fiedler_julia(mat, julia_path, julia_fiedler_script):
     # check output looks OK and return permutation
     if os.path.exists(outf):
         myperm = np.fromfile(outf, dtype=int, sep=',')
+        myperm = myperm - 1
         if (len(myperm) == mat.shape[0]):
             return myperm
     # output identity permutation if something went wrong
