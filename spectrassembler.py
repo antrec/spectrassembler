@@ -55,6 +55,10 @@ parser.add_argument("--margin", type=int, default=1250,
 parser.add_argument("--trim_margin", type=int, default=400,
                     help="length to cut in beginning and end of consensus sequences from spoa (where the consensus is" \
                          "less good)")
+parser.add_argument("--julia", default=None,
+help="path to Julia (optional,"\
+"though eigenvector computations are clearly faster in Julia than in Python)")
+
 
 args = parser.parse_args()
 opts = fill_args_opts(args)

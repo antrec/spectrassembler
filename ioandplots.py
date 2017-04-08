@@ -55,6 +55,10 @@ def fill_args_opts(args):
     opts['N_PROC'] = args.nproc
     opts['TRIM_MARGIN'] = args.trim_margin
     opts['MERGE_MARGIN'] = args.margin
+    opts['JULIA_PATH'] = args.julia
+
+    dir_path = os.path.dirname(os.path.realpath(__file__))
+    opts['JULIA_SCRIPT'] = dir_path + '/spectral_ordering.jl'
 
     # Check if SPOA found
     if os.path.exists(args.spoapath):
@@ -79,7 +83,7 @@ def fill_args_opts(args):
                 msg = "spoa executable not found. Provide it with option"\
                       "--spoapath if you wish to compute consensus sequences"
                 oprint(msg)
-    oprint(opts['SPOA_PATH'])
+
     DO_PLOT_POS_V_REF = False
     if args.ref_pos_csvf is not None:
         DO_PLOT_POS_V_REF = True

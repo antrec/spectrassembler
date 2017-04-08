@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
 Tools related to the spectral ordering algorithm.
@@ -9,7 +10,8 @@ does not exhibit a sufficiently small bandwidth.
 
 @author: Antoine Recanati
 """
-import warnings
+import subprocess
+import os
 import numpy as np
 from scipy.sparse import coo_matrix, eye, find
 from scipy.sparse.linalg import eigsh  # , ArpackNoConvergence
@@ -104,7 +106,7 @@ def get_fiedler(A):
 
     # Construct M = lambda_max(lap)*I - lap, whose "second largest"
     # eigenvector is the "second smallest" eigenvector of lap (Fiedler vector)
-    (evals_max, _) = eigsh(L_A, 1, which='LA', tol=1e-30, ncv=5)
+    (evals_max, _) = eigsh(L_A, 1, which='LA', tol=1e-15, ncv=20)
     maxval = float(evals_max)
     m_lap = maxval * eye(L_A.shape[0]) - L_A
     evec0 = np.ones((1, L_A.shape[0]))
@@ -114,6 +116,32 @@ def get_fiedler(A):
 
     return fidval, fidvec
 
+def get_fiedler_julia(mat, julia_path, julia_fiedler_script):
+
+    # Construct Laplacian
+    (iis, jjs, vvs) = find(mat)
+
+    # write to csv
+    itempf = 'mat_coords_iis.csv'
+    iis.tofile(itempf, sep=',')
+    jtempf = 'mat_coords_jjs.csv'
+    jjs.tofile(jtempf, sep=',')
+    vtempf = 'mat_data.csv'
+    vvs.tofile(vtempf, sep=',')
+
+    outf = 'temp_fidvec.csv'
+    # call julia
+    cmd = [julia_path, julia_fiedler_script, itempf, jtempf, vtempf, outf]
+    subprocess.call(cmd)
+
+    # check output looks OK and return permutation
+    if os.path.exists(outf):
+        myperm = np.fromfile(outf, dtype=int, sep=',')
+        if (len(myperm) == mat.shape[0]):
+            return myperm
+    # output identity permutation if something went wrong
+    else:
+        return np.arange(mat.shape[0])
 
 def reorder_submat(A, cc, num_match_l, qtile, ccs_ord, opts):
     """ Reorder matrix A with spectral ordering algorithm.
@@ -142,6 +170,8 @@ def reorder_submat(A, cc, num_match_l, qtile, ccs_ord, opts):
 
     VERB = opts['VERB']
     min_cc_len = opts['MIN_CC_LEN']
+    JULIA_PATH = opts['JULIA_PATH']
+    JULIA_SCRIPT = opts['JULIA_SCRIPT']
 
     (ncs, lbls) = connected_components(A, directed=False, return_labels=True)
     for nc in xrange(ncs):
@@ -153,10 +183,13 @@ def reorder_submat(A, cc, num_match_l, qtile, ccs_ord, opts):
         A_sub = A.copy().tocsr()
         A_sub = A_sub[cc_sub, :]
         A_sub = A_sub[:, cc_sub]
-        (fidval, fidvec) = get_fiedler(A_sub)
-        if fidval < 1e-12:
-            oprint("\n\nWARNING ! Non connected submatrix of size %d!\n\n" % (len(cc_sub)))
-        permu = np.argsort(fidvec)
+        if JULIA_PATH:
+            permu = get_fiedler_julia(A_sub, JULIA_PATH, JULIA_SCRIPT)
+        else:
+            (fidval, fidvec) = get_fiedler(A_sub)
+            if fidval < 1e-12:
+                oprint("\n\nWARNING ! Non connected submatrix of size %d!\n\n" % (len(cc_sub)))
+            permu = np.argsort(fidvec)
         cc_ord = [cc_sub[idx] for idx in permu]
         A_ord = A_sub.copy()
         A_ord = A_ord[permu, :]
