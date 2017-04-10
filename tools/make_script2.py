@@ -101,7 +101,8 @@ if args.racon and args.minimap:
     pp_fh.write(mycmd)
 
 mycmd = "/usr/bin/time -f \"%sE time %sK avg."\
-" mem %sM max mem\" /bin/bash %s 2> %s.log \n" % ('%', '%', '%', pp_script, pp_script.split('.sh')[0])
+" mem %sM max mem\" /bin/bash %s 2> %s.log 1> %s.out \n" % \
+('%', '%', '%', pp_script, pp_script.split('.sh')[0], pp_script.split('.sh')[0])
 runall_fh.write(mycmd)
 
 
@@ -118,7 +119,8 @@ mycmd = cmd_printer(args.minimap, args.minimap_opts, "$reads",
 minimap_fh.write(mycmd)
 
 mycmd = "/usr/bin/time -f \"%sE time %sK avg."\
-" mem %sM max mem\" /bin/bash %s 2> %s.log \n" % ('%', '%', '%', minimap_script, minimap_script.split('.sh')[0])
+" mem %sM max mem\" /bin/bash %s 2> %s.log 1> %s.out \n" % \
+('%', '%', '%', minimap_script, minimap_script.split('.sh')[0], minimap_script, minimap_script.split('.sh')[0])
 runall_fh.write(mycmd)
 
 # Create miniasm script
@@ -140,7 +142,8 @@ if args.miniasm:
     miniasm_fh.write(mycmd)
 
 mycmd = "/usr/bin/time -f \"%sE time %sK avg."\
-" mem %sM max mem\" /bin/bash %s 2> %s.log \n" % ('%', '%', '%', miniasm_script, miniasm_script.split('.sh')[0])
+" mem %sM max mem\" /bin/bash %s 2> %s.log 1> %s.out \n" % \
+('%', '%', '%', miniasm_script, miniasm_script.split('.sh')[0], miniasm_script.split('.sh')[0])
 runall_fh.write(mycmd)
 
 # Run spectrassembler
@@ -159,7 +162,8 @@ mycmd = cmd_printer("python %s/spectrassembler.py" % (spectrassembler), "-f $rea
 spectral_fh.write(mycmd)
 
 mycmd = "/usr/bin/time -f \"%sE time %sK avg."\
-" mem %sM max mem\" /bin/bash %s 2> %s.log \n" % ('%', '%', '%', spectral_script, spectral_script.split('.sh')[0])
+" mem %sM max mem\" /bin/bash %s 2> %s.log 1> %s.out \n" % \
+('%', '%', '%', spectral_script, spectral_script.split('.sh')[0], spectral_script.split('.sh')[0])
 runall_fh.write(mycmd)
 
 # Run Racon if provided
@@ -190,7 +194,9 @@ if args.racon and args.minimap:
     raconspectral_fh.write(mycmd)
 
     mycmd = "/usr/bin/time -f \"%sE time %sK avg."\
-    " mem %sM max mem\" /bin/bash %s 2> %s.log \n" % ('%', '%', '%', raconspectral_script, raconspectral_script.split('.sh')[0])
+    " mem %sM max mem\" /bin/bash %s 2> %s.log 1> %s.out \n" % \
+    ('%', '%', '%', raconspectral_script, raconspectral_script.split('.sh')[0],
+    raconspectral_script.split('.sh')[0])
     runall_fh.write(mycmd)
 
 
@@ -232,7 +238,9 @@ if args.racon and args.minimap:
         raconminiasm_fh.write(mycmd)
 
         mycmd = "/usr/bin/time -f \"%sE time %sK avg."\
-        " mem %sM max mem\" /bin/bash %s 2> %s.log \n" % ('%', '%', '%', raconminiasm_script, raconminiasm_script.split('.sh')[0])
+        " mem %sM max mem\" /bin/bash %s 2> %s.log 1> %s.out \n" % \
+        ('%', '%', '%', raconminiasm_script, raconminiasm_script.split('.sh')[0],
+        raconminiasm_script.split('.sh')[0])
         runall_fh.write(mycmd)
 
 
@@ -252,5 +260,7 @@ if args.canu:
     canu_fh.write(mycmd)
 
     mycmd = "/usr/bin/time -f \"%sE time %sK avg."\
-    " mem %sM max mem\" /bin/bash %s 2> %s.log \n" % ('%', '%', '%', canu_script, canu_script.split('.sh')[0])
+    " mem %sM max mem\" /bin/bash %s 2> %s.log 1> %s.out \n" % \
+    ('%', '%', '%', canu_script, canu_script.split('.sh')[0],
+    canu_script.split('.sh')[0])
     runall_fh.write(mycmd)
