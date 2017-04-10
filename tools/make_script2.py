@@ -120,7 +120,8 @@ minimap_fh.write(mycmd)
 
 mycmd = "/usr/bin/time -f \"%sE time %sK avg."\
 " mem %sM max mem\" /bin/bash %s 2> %s.log 1> %s.out \n" % \
-('%', '%', '%', minimap_script, minimap_script.split('.sh')[0], minimap_script, minimap_script.split('.sh')[0])
+('%', '%', '%', minimap_script, minimap_script.split('.sh')[0],
+ minimap_script.split('.sh')[0])
 runall_fh.write(mycmd)
 
 # Create miniasm script
