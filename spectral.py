@@ -13,7 +13,7 @@ does not exhibit a sufficiently small bandwidth.
 import subprocess
 import os
 import numpy as np
-from scipy.sparse import coo_matrix, eye, find
+from scipy.sparse import coo_matrix, eye, find, isspmatrix_csr
 from scipy.sparse.linalg import eigsh  # , ArpackNoConvergence
 from scipy.sparse.csgraph import laplacian, connected_components
 from scipy.stats.mstats import mquantiles
@@ -52,7 +52,8 @@ def remove_bridge_reads(a_mat):
     """
     Ikill = []
     Jkill = []
-    a_mat = a_mat.tocsr()
+    if not(isspmatrix_csr(a_mat)):
+        a_mat = a_mat.tocsr()
     for i in xrange(a_mat.shape[0]):
         (_, J, _) = find(a_mat[i, :])
         if len(J) == 0:
@@ -75,10 +76,12 @@ def remove_bridge_reads(a_mat):
     Ikill = np.array(Ikill)
     Jkill = np.array(Jkill)
     Vkill = np.ones(Ikill.size)
-    kill_mat = coo_matrix((Vkill, (Ikill, Jkill)), shape=a_mat.shape, dtype=int)
+    kill_mat = coo_matrix((Vkill, (Ikill, Jkill)), shape=a_mat.shape, dtype=int).tocsr()
     kill_mat = sym_max(kill_mat)
     kill_mat = kill_mat.multiply(a_mat)
     a_clr = a_mat - kill_mat
+    if not(isspmatrix_csr(a_clr)):
+        a_clr = a_clr.tocsr()
 
     return a_clr
 
@@ -174,6 +177,8 @@ def reorder_submat(A, cc, num_match_l, qtile, ccs_ord, opts):
     JULIA_PATH = opts['JULIA_PATH']
     JULIA_SCRIPT = opts['JULIA_SCRIPT']
 
+    if not isspmatrix_csr(A):
+        A = A.tocsr()
     (ncs, lbls) = connected_components(A, directed=False, return_labels=True)
     for nc in xrange(ncs):
         cc_sub = np.argwhere(lbls == nc)[:, 0]
@@ -181,10 +186,13 @@ def reorder_submat(A, cc, num_match_l, qtile, ccs_ord, opts):
             continue
         msg = " Running spectral algorithm in connected component of size %d..." % (len(cc_sub))
         oprint(msg, cond=(VERB >= 2))
-        A_sub = A.copy().tocsr()
-        A_sub = A_sub[cc_sub, :]
-        A_sub = A_sub[:, cc_sub]
-        if JULIA_PATH:
+        # A_sub = A.copy().tocsr()
+        # A_sub = A_sub[cc_sub, :]
+        # A_sub = A_sub[:, cc_sub]
+        A_sub = A[cc_sub, :][:, cc_sub]
+
+        # Use Julia if possible to reorder relatively large matrices
+        if JULIA_PATH and (len(cc_sub) > 1000):
             permu = get_fiedler_julia(A_sub, JULIA_PATH, JULIA_SCRIPT)
         else:
             (fidval, fidvec) = get_fiedler(A_sub)
@@ -192,10 +200,11 @@ def reorder_submat(A, cc, num_match_l, qtile, ccs_ord, opts):
                 oprint("\n\nWARNING ! Non connected submatrix of size %d!\n\n" % (len(cc_sub)))
             permu = np.argsort(fidvec)
         cc_ord = [cc_sub[idx] for idx in permu]
-        A_ord = A_sub.copy()
-        A_ord = A_ord[permu, :]
-        A_ord = A_ord[:, permu]
-        (ii, jj, _) = find(A_ord)
+        # A_ord = A_sub.copy()
+        # A_ord = A_ord[permu, :]
+        # A_ord = A_ord[:, permu]
+        # (ii, jj, _) = find(A_ord)
+        (ii, jj, _) = find(A_sub[permu, :][:, permu])
         bw = max(abs(ii - jj))
         if bw >= 80:
             oprint("Bandwidth larger than 80 in reordered matrix. Threshold in submatrix increased before reordering.",

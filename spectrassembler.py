@@ -89,18 +89,19 @@ K = K[idxok]
 
 # Construct similarity matrix
 oprint("Construct thresholded similarity matrix...", dt=(time() - t0), cond=(VERB >= 2))
-sim_mat = coo_matrix((num_match, (I, J)), shape=(n_reads, n_reads), dtype=int)
+sim_mat = coo_matrix((num_match, (I, J)), shape=(n_reads, n_reads), dtype=int).tocsr()
 oprint("Pre-process similarity matrix...", dt=(time() - t0), cond=(VERB >= 2))
 
 # Overlap index array : overlap(i,j) = ovl_list[k], with k = ovl_idx_arr[i,j]
-ovl_idx_arr = coo_matrix((K, (I, J)), shape=(n_reads, n_reads), dtype=int)
+ovl_idx_arr = coo_matrix((K, (I, J)), shape=(n_reads, n_reads), dtype=int).tocsr()
+ovl_idx_arr = sym_max(ovl_idx_arr)
 
 # Symmetrize the matrix when it is not already symmetric
 sim_mat = sym_max(sim_mat)
 # sim_mat = (sim_mat + sim_mat.T)
 
 # Remove "connecting reads"
-sim_mat = remove_bridge_reads(sim_mat).tocsr()
+sim_mat = remove_bridge_reads(sim_mat)
 oprint("Similarity matrix built and preprocessed. Reorder it with spectral ordering...", dt=(time() - t0),
        cond=(VERB >= 1))
 
@@ -121,10 +122,11 @@ make_dir(ROOT_DIR)
 for (cc_idx, cc) in enumerate(ccs_list):
 
     # Restrict overlap index array to reads in the connected component (contig)
-    ovl_idx_cc = ovl_idx_arr.copy().tocsc()[:, cc]
-    ovl_idx_cc = ovl_idx_cc.tocsr()[cc, :]
+    # ovl_idx_cc = ovl_idx_arr.copy().tocsc()[:, cc]
+    # ovl_idx_cc = ovl_idx_cc.tocsr()[cc, :]
+    ovl_idx_cc = ovl_idx_arr[cc,:][:,cc]
     # symmetrize if the overlapper does not count overlap twice for (i,j) and (j,i)
-    ovl_idx_cc = sym_max(ovl_idx_cc)
+    # ovl_idx_cc = sym_max(ovl_idx_cc)
 
     # Compute fine-grained position and strand of each read in connected component
     (strand_list, bpos_list, epos_list) = compute_positions(cc, read_nb2id, ovl_list, ovl_idx_cc)

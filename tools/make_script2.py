@@ -59,6 +59,7 @@ parser.add_argument("--canu_opts", default="",
 parser.add_argument("--spectrassembler_opts", default="",
                     help="options for spectrassembler")
 parser.add_argument("--spoa", help="path/to/spoa/")
+parser.add_argument("--python", default="python", help="path/to/python")
 
 args = parser.parse_args()
 tools_path = os.path.realpath(__file__)
@@ -83,7 +84,7 @@ pp_fh.write("if [ ! -d \"%s\" ]; then mkdir %s; fi\n" % (args.dir, args.dir))
 
 # Check read ids are unique
 pp_fh.write("# Check that read ids are unique\n")
-pp_fh.write("python %s/tools/check_reads.py %s\n" % (spectrassembler, args.reads))
+pp_fh.write("%s %s/tools/check_reads.py %s\n" % (args.python, spectrassembler, args.reads))
 readspp = '.'.join(args.reads.split('.')[:-1]) + '.pp.' + args.reads.split('.')[-1]
 pp_fh.write("if [ -e \"%s\" ]; then reads=\"%s\"; fi\n" % (readspp, readspp))
 
@@ -96,8 +97,8 @@ if args.racon and args.minimap:
     \nelse\
     \n  echo \"Reads are in fasta format. Convert to fastq before calling racon...\"\
     \n  readsq=\"${reads/.f*a/.fastq}\"\
-    \n  python %s/tools/fasta2fastq.py \"$reads\" \"$readsq\"\
-    \nfi\n" % (spectrassembler)
+    \n  %s %s/tools/fasta2fastq.py \"$reads\" \"$readsq\"\
+    \nfi\n" % (args.python, spectrassembler)
     pp_fh.write(mycmd)
 
 mycmd = "/usr/bin/time -f \"%sE time %sK avg."\
@@ -139,7 +140,7 @@ if args.miniasm:
     minimap_out, output=miniasm_out, comment=do_comment)
     miniasm_fh.write(mycmd)
     miniasm_fasta = "%s/%s.miniasm.fasta" % (miniasm_dir, args.prefix)
-    mycmd = "#awk '/^S/{print \">\"$2\"\\n\"$3}' %s | fold > %s\n" % (miniasm_out, miniasm_fasta)
+    mycmd = "awk '/^S/{print \">\"$2\"\\n\"$3}' %s | fold > %s\n" % (miniasm_out, miniasm_fasta)
     miniasm_fh.write(mycmd)
 
 mycmd = "/usr/bin/time -f \"%sE time %sK avg."\
@@ -157,7 +158,7 @@ spectral_fh.write("reads=\"%s\"\n" % args.reads)
 spectral_fh.write("if [ -e \"%s\" ]; then reads=\"%s\"; fi\n" % (readspp, readspp))
 spectral_fh.write("# Run spectral\n")
 spectral_out = "%s/%s.spectral.fasta" % (spectral_dir, args.prefix)
-mycmd = cmd_printer("python %s/spectrassembler.py" % (spectrassembler), "-f $reads",
+mycmd = cmd_printer("%s %s/spectrassembler.py" % (args.python, spectrassembler), "-f $reads",
             "-m", minimap_out, "-r", spectral_dir,
             args.spectrassembler_opts, output=spectral_out, comment=do_comment)
 spectral_fh.write(mycmd)
@@ -174,6 +175,7 @@ if args.racon and args.minimap:
     raconspectral_fh = open(raconspectral_script, 'wb')
     raconspectral_fh.write("#!/bin/bash\n")
     raconspectral_fh.write("if [ ! -d \"%s\" ]; then mkdir %s; fi\n" % (raconspectral_dir, raconspectral_dir))
+    raconspectral_fh.write("reads=\"%s\"\n" % args.reads)
     raconspectral_fh.write("# Check that reads are .fastq for racon\n")
     mycmd = "if [ \"${reads:(-1)}\" == \"q\" ]; then\
     \n  readsq=\"$reads\"\
@@ -184,7 +186,7 @@ if args.racon and args.minimap:
     raconspectral_fh.write("# Run racon + spectral\n")
     # Map reads to miniasm assembly with minimap
     spectral_mappings_out = "%s/%s.spectral_mappings.paf" % (raconspectral_dir, args.prefix)
-    mycmd = cmd_printer(args.minimap, spectral_out, "$readsq",
+    mycmd = cmd_printer(args.minimap, args.minimap_opts, spectral_out, "$readsq",
     output=spectral_mappings_out, comment=do_comment)
     raconspectral_fh.write(mycmd)
 
@@ -208,6 +210,7 @@ if args.racon and args.minimap:
         raconminiasm_fh = open(raconminiasm_script, 'wb')
         raconminiasm_fh.write("#!/bin/bash\n")
         raconminiasm_fh.write("if [ ! -d \"%s\" ]; then mkdir %s; fi\n" % (raconminiasm_dir, raconminiasm_dir))
+        raconminiasm_fh.write("reads=\"%s\"\n" % args.reads)
         raconminiasm_fh.write("# Check that reads are .fastq for racon\n")
         mycmd = "if [ \"${reads:(-1)}\" == \"q\" ]; then\
         \n  readsq=\"$reads\"\
@@ -218,7 +221,7 @@ if args.racon and args.minimap:
         raconminiasm_fh.write("# Run racon + miniasm\n")
         # Map reads to miniasm assembly with minimap
         mappings_out = "%s/%s.miniasm_mappings.paf" % (raconminiasm_dir, args.prefix)
-        mycmd = cmd_printer(args.minimap, miniasm_fasta, "$readsq", output=mappings_out, comment=do_comment)
+        mycmd = cmd_printer(args.minimap, args.minimap_opts, miniasm_fasta, "$readsq", output=mappings_out, comment=do_comment)
         raconminiasm_fh.write(mycmd)
 
         # Run Racon
@@ -230,7 +233,7 @@ if args.racon and args.minimap:
         raconminiasm_fh.write("# Run racon + miniasm 2nd iteration\n")
         # Map reads to miniasm assembly with minimap
         mappings2_out = "%s/%s.racon2_mappings.paf" % (raconminiasm_dir, args.prefix)
-        mycmd = cmd_printer(args.minimap, racon_out, "$readsq", output=mappings2_out)
+        mycmd = cmd_printer(args.minimap, args.minimap_opts, racon_out, "$readsq", output=mappings2_out)
         raconminiasm_fh.write(mycmd)
 
         # Run Racon
