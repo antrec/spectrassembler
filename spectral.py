@@ -196,7 +196,7 @@ def reorder_submat(A, cc, num_match_l, qtile, ccs_ord, opts):
         A_sub = A[cc_sub, :][:, cc_sub]
 
         # Use Julia if possible to reorder relatively large matrices
-        if JULIA_PATH and (len(cc_sub) > 1200):
+        if JULIA_PATH and (len(cc_sub) > 12000):
             permu = get_fiedler_julia(A_sub, JULIA_PATH, JULIA_SCRIPT)
         else:
             (fidval, fidvec) = get_fiedler(A_sub)
