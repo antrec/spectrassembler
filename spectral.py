@@ -178,6 +178,8 @@ def reorder_submat(A, cc, num_match_l, qtile, ccs_ord, opts):
     JULIA_PATH = opts['JULIA_PATH']
     JULIA_SCRIPT = opts['JULIA_SCRIPT']
 
+    t0 = time()
+
     if not isspmatrix_csr(A):
         A = A.tocsr()
     (ncs, lbls) = connected_components(A, directed=False, return_labels=True)
@@ -186,7 +188,7 @@ def reorder_submat(A, cc, num_match_l, qtile, ccs_ord, opts):
         if len(cc_sub) <= min_cc_len:
             continue
         msg = " Running spectral algorithm in connected component of size %d..." % (len(cc_sub))
-        t0 = time()
+        t1 = time()
         oprint(msg, cond=(VERB >= 2))
         # A_sub = A.copy().tocsr()
         # A_sub = A_sub[cc_sub, :]
@@ -219,5 +221,5 @@ def reorder_submat(A, cc, num_match_l, qtile, ccs_ord, opts):
             reorder_submat(A_sub, cc_abs, num_match_l, new_qtile, ccs_ord, opts)
         else:
             ccs_ord.append([cc[idx] for idx in cc_ord])
-            oprint("Done in %3.3f" %(time() - t0), cond=(VERB >= 2))
+            oprint("Done in %3.3f." %(time() - t1), dt=(time() - t0), cond=(VERB >= 2))
     return
