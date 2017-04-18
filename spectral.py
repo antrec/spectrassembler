@@ -10,6 +10,7 @@ does not exhibit a sufficiently small bandwidth.
 
 @author: Antoine Recanati
 """
+from time import time
 import subprocess
 import os
 import numpy as np
@@ -185,6 +186,7 @@ def reorder_submat(A, cc, num_match_l, qtile, ccs_ord, opts):
         if len(cc_sub) <= min_cc_len:
             continue
         msg = " Running spectral algorithm in connected component of size %d..." % (len(cc_sub))
+        t0 = time()
         oprint(msg, cond=(VERB >= 2))
         # A_sub = A.copy().tocsr()
         # A_sub = A_sub[cc_sub, :]
@@ -192,7 +194,7 @@ def reorder_submat(A, cc, num_match_l, qtile, ccs_ord, opts):
         A_sub = A[cc_sub, :][:, cc_sub]
 
         # Use Julia if possible to reorder relatively large matrices
-        if JULIA_PATH and (len(cc_sub) > 1000):
+        if JULIA_PATH and (len(cc_sub) > 1200):
             permu = get_fiedler_julia(A_sub, JULIA_PATH, JULIA_SCRIPT)
         else:
             (fidval, fidvec) = get_fiedler(A_sub)
@@ -217,5 +219,5 @@ def reorder_submat(A, cc, num_match_l, qtile, ccs_ord, opts):
             reorder_submat(A_sub, cc_abs, num_match_l, new_qtile, ccs_ord, opts)
         else:
             ccs_ord.append([cc[idx] for idx in cc_ord])
-            oprint("Done.", cond=(VERB >= 2))
+            oprint("Done in %3.3f" %(time() - t0), cond=(VERB >= 2))
     return
