@@ -14,6 +14,8 @@ Some parts of this code are inspired from nanocorrect (https://github.com/jts/na
 
 @author: Antoine Recanati
 """
+from __future__ import print_function
+import sys
 import os
 import numpy as np
 import subprocess
@@ -53,19 +55,17 @@ def run_spoa(filename, spoa_path, reads_fmt):
 
 
 
-def fill_window(in_fn, w_idx, record_list, cc_idx, cc, bpos_list,
-epos_list, n_windows, opts):
+def fill_window(w_idx, record_list, cc_idx, cc, bpos_list,
+epos_list, opts):
     """ Writes pieces of sequences that fits in the current window to a .fasta file for multiple sequence alignment.
 
     Parameters
     ----------
-    in_fn : str (path to the file to write in)
     w_idx : int (current window number)
     record_list : list (reads in SeqIO record format)
     cc_idx : int (index of the connected component)
     cc : list (index of the reads in the cc_idx-th connected component)
     bpos_list : numpy.ndarray (leftmost base coordinate of the reads in the connected component)
-    n_windows : int (total number of windows in connected component)
     opts : dict (keywords arguments for global parameters)
 
     """
@@ -78,6 +78,8 @@ epos_list, n_windows, opts):
     w_e = w_b + W_LEN
     reads_in_w = np.flatnonzero((bpos_list < w_e)*(epos_list > w_b))
 
+    cc_dir = "%s/cc_%d" % (opts['ROOT_DIR'], cc_idx)
+    in_fn = cc_dir + "/poa_in_cc_%d_win_%d.%s" % (cc_idx, w_idx, READS_FMT)
     in_fh = open(in_fn, 'wb')
     for idx in reads_in_w:
         read_idx = cc[idx]
@@ -98,6 +100,56 @@ epos_list, n_windows, opts):
 
     in_fh.close()
     return
+
+def fill_and_run_spoa(w_idx, record_list, cc_idx, cc, bpos_list,
+epos_list, opts):
+    """ Writes pieces of sequences that fits in the current window to a .fasta file for multiple sequence alignment.
+
+    Parameters
+    ----------
+    w_idx : int (current window number)
+    record_list : list (reads in SeqIO record format)
+    cc_idx : int (index of the connected component)
+    cc : list (index of the reads in the cc_idx-th connected component)
+    bpos_list : numpy.ndarray (leftmost base coordinate of the reads in the connected component)
+    opts : dict (keywords arguments for global parameters)
+
+    """
+    # retrieve options from opts dictionary
+    W_LEN = opts['W_LEN']
+    W_OVL_LEN = opts['W_OVL_LEN']
+    READS_FMT = opts['READS_FMT']
+
+    w_b = (W_LEN - W_OVL_LEN) * w_idx
+    w_e = w_b + W_LEN
+    reads_in_w = np.flatnonzero((bpos_list < w_e)*(epos_list > w_b))
+
+    cc_dir = "%s/cc_%d" % (opts['ROOT_DIR'], cc_idx)
+    in_fn = cc_dir + "/poa_in_cc_%d_win_%d.%s" % (cc_idx, w_idx, READS_FMT)
+    in_fh = open(in_fn, 'wb')
+    for idx in reads_in_w:
+        read_idx = cc[idx]
+        record = record_list[read_idx]
+
+        # Trim read to the part contained in the window
+        read_len = len(record.seq)
+        bb = int(max(0, w_b - bpos_list[idx]))
+        ee = int(min(read_len, w_e - bpos_list[idx]))
+
+        # Do not add too small pieces of sequence
+        if ee - bb < 20:
+            continue
+
+        # Write to poa_in file
+        seqfmtd = record[bb:ee].format(READS_FMT)
+        in_fh.write(seqfmtd)
+
+    in_fh.close()
+
+    run_spoa(in_fn, opts['SPOA_PATH'], opts['READS_FMT'])
+
+    return
+
 
 
 def run_spoa_in_cc(record_list, cc_idx, cc, strand_list, bpos_list,
@@ -121,8 +173,8 @@ epos_list, opts):
     W_OVL_LEN = opts['W_OVL_LEN']
     N_PROC = opts['N_PROC']
     ROOT_DIR = opts['ROOT_DIR']
-    SPOA_PATH = opts['SPOA_PATH']
-    READS_FMT = opts['READS_FMT']
+    # SPOA_PATH = opts['SPOA_PATH']
+    # READS_FMT = opts['READS_FMT']
 
     # Make cc_dir dictionary if not existent
     cc_dir = "%s/cc_%d" % (ROOT_DIR, cc_idx)
@@ -143,28 +195,34 @@ epos_list, opts):
             record_list[read_idx] = record_list[read_idx].reverse_complement()
             record_list[read_idx].id = read_id
 
-    # Define run_spoa function with SPOA_PATH and READS_FMT fixed
-    partial_run_spoa = partial(run_spoa, spoa_path=SPOA_PATH,
-                               reads_fmt=READS_FMT)
-
     if N_PROC > 1:
+        fill_and_run = partial(fill_and_run_spoa,
+        record_list=record_list, cc_idx=cc_idx, cc=cc, bpos_list=bpos_list,
+        epos_list=epos_list, opts=opts)
         mypool = Pool(processes=N_PROC)
-
-    for w_idx in xrange(n_windows):
-
-        in_fn = cc_dir + "/poa_in_cc_%d_win_%d.%s" % (cc_idx, w_idx, READS_FMT)
-
-        fill_window(in_fn, w_idx, record_list, cc_idx, cc,
-                    bpos_list, epos_list, n_windows, opts)
-        if N_PROC == 1:
-            run_spoa(in_fn, SPOA_PATH, READS_FMT)
-        else:
-            mypool.apply_async(partial_run_spoa, args=(in_fn,))
-
-    if N_PROC > 1:
+        mypool.map(fill_and_run, range(n_windows))
         mypool.close()
         mypool.join()
 
+    # # Define run_spoa function with SPOA_PATH and READS_FMT fixed
+    # partial_run_spoa = partial(run_spoa, spoa_path=SPOA_PATH,
+    #                            reads_fmt=READS_FMT)
+    #
+    # for w_idx in xrange(n_windows):
+    #
+    #     in_fn = cc_dir + "/poa_in_cc_%d_win_%d.%s" % (cc_idx, w_idx, READS_FMT)
+    #
+    #     fill_window(w_idx, record_list, cc_idx, cc,
+    #                 bpos_list, epos_list, opts)
+    #     if N_PROC == 1:
+    #         run_spoa(in_fn, SPOA_PATH, READS_FMT)
+    #     else:
+    #         mypool.apply_async(partial_run_spoa, args=(in_fn,))
+    #
+    # if N_PROC > 1:
+    #     mypool.close()
+    #     mypool.join()
+    #
     return
 
 
@@ -273,13 +331,12 @@ def add_next_window(temp_fn, w_idx, cc_idx, whole_cons, opts, trim_margin):
     return cons0 + cons1b
 
 
-def merge_windows_in_cc(cc_idx, cc_dir, opts):
+def merge_windows_in_cc(cc_idx, opts):
     """ Merge the consensus sequences from all windows into one sequence (contig).
 
     Parameters
     ----------
     cc_idx : int (index of the connected component)
-    cc_dir : str (path to directory where the temporary files are written to)
     opts : dict (keywords arguments for global parameters)
 
     """
@@ -328,5 +385,7 @@ def merge_windows_in_cc(cc_idx, cc_dir, opts):
     consensus_fh = open(consensus_fn, "wb")
     consensus_fh.write(">consensus_from_windows_contig_%d\n%s\n" % (cc_idx, whole_cons))
     consensus_fh.close()
+
+    # print(">contig_%d\n%s" % (cc_idx, whole_cons), file=sys.stdout)
 
     return whole_cons

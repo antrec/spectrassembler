@@ -9,13 +9,15 @@ from __future__ import print_function
 from time import time
 import sys
 import argparse
+from functools import partial
+from multiprocessing import Pool
 import numpy as np
 from Bio import SeqIO
 from scipy.sparse import coo_matrix
 from scipy.stats.mstats import mquantiles
 
 from overlaps import compute_positions, compute_overlaps
-from spectral import sym_max, remove_bridge_reads, reorder_submat
+from spectral3 import sym_max, remove_bridge_reads, reorder_mat_par, reorder_mat
 from consensus import run_spoa_in_cc, merge_windows_in_cc
 from ioandplots import fill_args_opts, make_dir, oprint, write_layout_to_file, plot_cc_pos_v_ref
 
@@ -52,7 +54,7 @@ parser.add_argument("--nproc", help="number of parallel processes", type=int,
                     default=1)
 parser.add_argument("--margin", type=int, default=1250,
                     help="number of bases to add to current consensus to make sure it overlaps next window")
-parser.add_argument("--trim_margin", type=int, default=400,
+parser.add_argument("--trim_margin", type=int, default=200,
                     help="length to cut in beginning and end of consensus sequences from spoa (where the consensus is" \
                          "less good)")
 parser.add_argument("--julia", default=None,
@@ -84,7 +86,7 @@ num_match_l = num_match
 I = I[idxok]
 J = J[idxok]
 num_match = num_match[idxok]
-ovl_len = ovl_len[idxok]
+# ovl_len = ovl_len[idxok]
 K = K[idxok]
 
 # Construct similarity matrix
@@ -102,6 +104,7 @@ sim_mat = sym_max(sim_mat)
 
 # Remove "connecting reads"
 sim_mat = remove_bridge_reads(sim_mat)
+del I, J, K, ovl_len, num_match
 oprint("Similarity matrix built and preprocessed. Reorder it with spectral ordering...", dt=(time() - t0),
        cond=(VERB >= 1))
 
@@ -109,7 +112,23 @@ oprint("Similarity matrix built and preprocessed. Reorder it with spectral order
 ccs_list = []
 cc = range(sim_mat.shape[0])
 qtile = args.sim_qtile
-reorder_submat(sim_mat, cc, num_match_l, qtile, ccs_list, opts)
+t_start_layout = time()
+# reorder_submat(sim_mat, cc, num_match_l, qtile, ccs_list, opts)
+thr_list = []
+new_qtile = qtile
+for k in range(40):
+    thr_sub = float(mquantiles(num_match_l, new_qtile))
+    thr_list.append(thr_sub)
+    new_qtile += min(0.1, 0.5 * (1. - new_qtile))
+del num_match_l
+if opts['N_PROC'] > 1:
+    ccs_list = reorder_mat_par(sim_mat, thr_list, opts)
+else:
+    ccs_list = reorder_mat(sim_mat, thr_list, opts['MIN_CC_LEN'], opts['VERB'])
+
+t_rough_layout = time() - t_start_layout
+oprint("Rough layout computed in %3.3f." % (t_rough_layout),
+        dt=(time() - t0), cond=(VERB >= 1))
 
 # Sort by length of connected component
 ccs_list.sort(key=len, reverse=True)
@@ -117,6 +136,8 @@ oprint("Compute fine grained layout and run spoa in connected components...", dt
 
 # If root_dir does not exist, create it
 make_dir(ROOT_DIR)
+
+t_total_finegrained = 0
 
 # Get fine-grained layout with dictionary of overlaps in each connected component
 for (cc_idx, cc) in enumerate(ccs_list):
@@ -129,8 +150,13 @@ for (cc_idx, cc) in enumerate(ccs_list):
     # ovl_idx_cc = sym_max(ovl_idx_cc)
 
     # Compute fine-grained position and strand of each read in connected component
+    t_start_fg_layout = time()
     (strand_list, bpos_list, epos_list) = compute_positions(cc, read_nb2id, ovl_list, ovl_idx_cc)
-    msg = "Positions computed in connected component %d/%d. Run spoa..." % (cc_idx, len(ccs_list) - 1)
+    t_finegrained = time() - t_start_fg_layout
+    t_total_finegrained += t_finegrained
+    msg = "Positions computed in connected component"\
+    "%d/%d in %3.3f.\n Now run spoa if provided." % (cc_idx,
+    len(ccs_list) - 1, t_finegrained)
     oprint(msg, dt=(time() - t0), cond=(VERB >= 2))
 
     # Write file with layout
@@ -148,15 +174,33 @@ for (cc_idx, cc) in enumerate(ccs_list):
     # Generate contigs through multiple sequence alignment
     if opts['DO_SPOA']:
         # Compute consensus in windows
-        cc_dir = "%s/cc_%d" % (ROOT_DIR, cc_idx)
         run_spoa_in_cc(record_list, cc_idx, cc, strand_list, bpos_list,
         epos_list, opts)
 
+        if opts['N_PROC'] == 1:
         # Merge windows to get consensus
-        cons_in_cc = merge_windows_in_cc(cc_idx, cc_dir, opts)
-        print(">contig_%d\n%s" % (cc_idx, cons_in_cc), file=sys.stdout)
+            cons_in_cc = merge_windows_in_cc(cc_idx, opts)
+            print(">contig_%d\n%s" % (cc_idx, cons_in_cc), file=sys.stdout)
 
-        msg = "Consensus computed in connected component %d/%d. " % (cc_idx, len(ccs_list) - 1)
-        oprint(msg, dt=(time() - t0), cond=(VERB >= 1))
+            msg = "Consensus computed in connected component %d/%d. " % (cc_idx, len(ccs_list) - 1)
+            oprint(msg, dt=(time() - t0), cond=(VERB >= 1))
 
     del strand_list, bpos_list, epos_list, ovl_idx_cc
+
+# Parallelize the merging of consensus windows if several cores
+if (opts['N_PROC'] > 1) and opts['DO_SPOA']:
+    partial_merge = partial(merge_windows_in_cc, opts=opts)
+    pool = Pool(processes=opts['N_PROC'])
+    consensi_in_cc = pool.map(partial_merge, range(len(ccs_list)))
+    pool.close()
+    pool.join()
+
+    for (cc_idx, cons_in_cc) in enumerate(consensi_in_cc):
+        print(">contig_%d\n%s" % (cc_idx, cons_in_cc), file=sys.stdout)
+
+
+
+
+oprint("Finished.\nRough layout computed in %4.3f.\n Fine-grained layout computed in %4.3f." % (
+        t_rough_layout, t_total_finegrained),
+        dt=(time() - t0), cond=(VERB >= 1))

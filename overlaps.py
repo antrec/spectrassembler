@@ -191,8 +191,8 @@ def compute_overlaps(mini_fn, record_list):
     i_list = h_list//n_reads
     j_list = h_list - n_reads*i_list
 
-    fh.close()
-    read_nb2id = {v: k for (k, v) in read_nb_dic.items()}
+    # fh.close()
+    read_nb2id = {v : k for (k, v) in read_nb_dic.items()}
 
     return read_nb2id, ovl_list, i_list, j_list, k_list, n_match_list, ovl_len_list, n_reads
 

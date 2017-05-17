@@ -21,6 +21,7 @@ def cmd_printer(exec_line, *args, **kwargs):
     [with options and with output redirected if specified in *args and *kwargs]
     when the bash script is ran.)
     """
+    comment = False
     cmd = "time %s " % exec_line
     for arg in args:
         cmd += "%s " % arg
@@ -28,7 +29,12 @@ def cmd_printer(exec_line, *args, **kwargs):
         for key, value in kwargs.iteritems():
             if key in ["out", "output", "output_file"]:
                 cmd += "> %s" % value
+            if key == 'comment' and value == True:
+                comment=True
     cmd += "\n"
+
+    if comment:
+        cmd = '#' + cmd
 
     return cmd
 
@@ -58,6 +64,10 @@ args = parser.parse_args()
 tools_path = os.path.realpath(__file__)
 spectrassembler = tools_path.split('/tools')[0]
 
+# In order not to recompute old things
+do_comment = False
+
+
 # Open script file
 script_fn = "%s_script.sh" % (args.prefix)
 fh = open(script_fn, 'wb')
@@ -77,7 +87,7 @@ fh.write("if [ -e \"%s\" ]; then reads=\"%s\"; fi\n" % (readspp, readspp))
 fh.write("# Run minimap\n")
 minimap_out = "%s/%s.mini.paf" % (args.dir, args.prefix)
 mycmd = cmd_printer(args.minimap, args.minimap_opts, "$reads",
-"$reads", output=minimap_out)
+"$reads", output=minimap_out, comment=do_comment)
 fh.write(mycmd)
 
 # Run miniasm if provided
@@ -85,10 +95,10 @@ if args.miniasm:
     fh.write("# Run miniasm\n")
     miniasm_out = "%s/%s.miniasm.gfa" % (args.dir, args.prefix)
     mycmd = cmd_printer(args.miniasm, args.miniasm_opts, "-f $reads",
-    minimap_out, output=miniasm_out)
+    minimap_out, output=miniasm_out, comment=do_comment)
     fh.write(mycmd)
     miniasm_fasta = "%s/%s.miniasm.fasta" % (args.dir, args.prefix)
-    mycmd = "awk '/^S/{print \">\"$2\"\\n\"$3}' %s | fold > %s\n" % (miniasm_out, miniasm_fasta)
+    mycmd = "#awk '/^S/{print \">\"$2\"\\n\"$3}' %s | fold > %s\n" % (miniasm_out, miniasm_fasta)
     fh.write(mycmd)
 
 # Run spectrassembler
@@ -97,7 +107,7 @@ spectral_out = "%s/%s.spectral.fasta" % (args.dir, args.prefix)
 spectral_dir = "%s/spectral" % (args.dir)
 mycmd = cmd_printer("python %s/spectrassembler.py" % (spectrassembler), "-f $reads",
             "-m", minimap_out, "-r", spectral_dir,
-            args.spectrassembler_opts, output=spectral_out)
+            args.spectrassembler_opts, output=spectral_out, comment=do_comment)
 fh.write(mycmd)
 
 # Run Racon if provided
@@ -117,13 +127,13 @@ if args.racon and args.minimap:
     # Map reads to miniasm assembly with minimap
     spectral_mappings_out = "%s/%s.spectral_mappings.paf" % (args.dir, args.prefix)
     mycmd = cmd_printer(args.minimap, spectral_out, "$readsq",
-    output=spectral_mappings_out)
+    output=spectral_mappings_out, comment=do_comment)
     fh.write(mycmd)
 
     # Run Racon
     spectral_racon_out = "%s/%s.spectral_racon.fasta" % (args.dir, args.prefix)
     mycmd = cmd_printer(args.racon, "$readsq", spectral_mappings_out,
-    spectral_out, spectral_racon_out)
+    spectral_out, spectral_racon_out, comment=do_comment)
     fh.write(mycmd)
 
     # Racon + miniasm
@@ -131,18 +141,31 @@ if args.racon and args.minimap:
         fh.write("# Run racon + miniasm\n")
         # Map reads to miniasm assembly with minimap
         mappings_out = "%s/%s.miniasm_mappings.paf" % (args.dir, args.prefix)
-        mycmd = cmd_printer(args.minimap, miniasm_fasta, "$readsq", output=mappings_out)
+        mycmd = cmd_printer(args.minimap, miniasm_fasta, "$readsq", output=mappings_out, comment=do_comment)
         fh.write(mycmd)
 
         # Run Racon
-        racon_out = "%s/%s.racon.fasta" % (args.dir, args.prefix)
-        mycmd = cmd_printer(args.racon, "$readsq", mappings_out, miniasm_out, racon_out)
+        racon_out = "%s/%s.miniasm_racon.fasta" % (args.dir, args.prefix)
+        mycmd = cmd_printer(args.racon, "$readsq", mappings_out, miniasm_out, racon_out, comment=do_comment)
         fh.write(mycmd)
+
+        # Round 2 of Racon + miniasm
+        fh.write("# Run racon + miniasm 2nd iteration\n")
+        # Map reads to miniasm assembly with minimap
+        mappings2_out = "%s/%s.racon2_mappings.paf" % (args.dir, args.prefix)
+        mycmd = cmd_printer(args.minimap, racon_out, "$readsq", output=mappings2_out)
+        fh.write(mycmd)
+
+        # Run Racon
+        racon2_out = "%s/%s.miniasm_racon2.fasta" % (args.dir, args.prefix)
+        mycmd = cmd_printer(args.racon, "$readsq", mappings2_out, racon_out, racon2_out)
+        fh.write(mycmd)
+
 
 # Run Canu if provided
 if args.canu:
     fh.write("# Run Canu\n")
     canu_dir = "%s/canu" % (args.dir)
     mycmd = cmd_printer(args.canu, "-p", args.prefix, "-d", canu_dir,
-    args.canu_opts)
+    args.canu_opts, comment=do_comment)
     fh.write(mycmd)
