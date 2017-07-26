@@ -204,6 +204,11 @@ epos_list, opts):
         mypool.close()
         mypool.join()
 
+    else:
+        for w_idx in xrange(n_windows):
+            fill_and_run_spoa(w_idx, record_list, cc_idx, cc, bpos_list,
+            epos_list, opts)
+
     # # Define run_spoa function with SPOA_PATH and READS_FMT fixed
     # partial_run_spoa = partial(run_spoa, spoa_path=SPOA_PATH,
     #                            reads_fmt=READS_FMT)

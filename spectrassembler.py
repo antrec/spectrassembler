@@ -17,7 +17,7 @@ from scipy.sparse import coo_matrix
 from scipy.stats.mstats import mquantiles
 
 from overlaps import compute_positions, compute_overlaps
-from spectral3 import sym_max, remove_bridge_reads, reorder_mat_par, reorder_mat
+from spectral import sym_max, remove_bridge_reads, reorder_mat_par, reorder_mat
 from consensus import run_spoa_in_cc, merge_windows_in_cc
 from ioandplots import fill_args_opts, make_dir, oprint, write_layout_to_file, plot_cc_pos_v_ref
 
