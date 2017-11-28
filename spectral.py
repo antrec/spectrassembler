@@ -327,7 +327,7 @@ def reord_submat(in_tuple, A, opts):
         msg = " Running spectral algorithm in connected "\
               "component of size %d..." % (len(cc_sub))
         oprint(msg, cond=(verb >= 2))
-        # t1 = time()
+        t1 = time()
 
         if JULIA_PATH and (len(cc_sub) > 3000):
             permu = get_fiedler_julia(A_sub[cc_sub, :][:, cc_sub], JULIA_PATH, JULIA_SCRIPT)
